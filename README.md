@@ -39,6 +39,27 @@ hadoop-bigdata-learning/
 
 ## 🚀 Quick Start
 
+### Option 1: Docker Environment (Quickest)
+```bash
+cd docker/complete-stack
+docker-compose up -d
+```
+This gives you a complete Big Data stack in containers!
+
+### Option 2: CDP Environment (Enterprise-like)
+```bash
+cd docker/cdp-stack
+docker-compose up -d
+```
+Experience Cloudera Data Platform in containers!
+
+### Option 3: Native Installation
+```powershell
+# Run the automated installer
+./scripts/Install-BigDataStack.ps1
+```
+
+### Option 4: Manual Learning Path
 1. **Prerequisites Setup**: Install Java, Docker, and development tools
 2. **Follow Installation Guides**: Step-by-step setup in `/docs/installation/`
 3. **Practice with Examples**: Hands-on exercises in `/examples/`

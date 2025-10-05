@@ -1,0 +1,356 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for CDP services
+  cdp-postgres:
+    image: postgres:13
+    container_name: cdp-postgres
+    hostname: cdp-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=cdp
+      - POSTGRES_USER=cdp
+      - POSTGRES_PASSWORD=cdp_password
+      - POSTGRES_MULTIPLE_DATABASES=scm,hive_metastore,ranger,atlas
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+      - ./init/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    networks:
+      - cdp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cdp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Zookeeper for coordination
+  cdp-zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: cdp-zookeeper
+    hostname: cdp-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - ./volumes/zookeeper:/var/lib/zookeeper
+    networks:
+      - cdp-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Hadoop NameNode
+  cdp-namenode:
+    image: apache/hadoop:3.3.4
+    container_name: cdp-namenode
+    hostname: cdp-namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    environment:
+      - CLUSTER_NAME=cdp-cluster
+      - CORE_CONF_fs_defaultFS=hdfs://cdp-namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_namenode_name_dir=/hadoop/dfs/name
+      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
+      - HDFS_CONF_dfs_replication=1
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
+      - HDFS_CONF_dfs_client_use_datanode_hostname=true
+      - HDFS_CONF_dfs_datanode_use_datanode_hostname=true
+    volumes:
+      - ./volumes/namenode:/hadoop/dfs/name
+      - ./volumes/shared:/shared
+    command: ["hdfs", "namenode"]
+    networks:
+      - cdp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Hadoop DataNode
+  cdp-datanode:
+    image: apache/hadoop:3.3.4
+    container_name: cdp-datanode
+    hostname: cdp-datanode
+    ports:
+      - "9864:9864"
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://cdp-namenode:9000
+      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
+      - HDFS_CONF_dfs_datanode_http_address=0.0.0.0:9864
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
+      - HDFS_CONF_dfs_client_use_datanode_hostname=true
+      - HDFS_CONF_dfs_datanode_use_datanode_hostname=true
+    volumes:
+      - ./volumes/datanode:/hadoop/dfs/data
+      - ./volumes/shared:/shared
+    command: ["hdfs", "datanode"]
+    depends_on:
+      cdp-namenode:
+        condition: service_healthy
+    networks:
+      - cdp-network
+
+  # YARN ResourceManager
+  cdp-resourcemanager:
+    image: apache/hadoop:3.3.4
+    container_name: cdp-resourcemanager
+    hostname: cdp-resourcemanager
+    ports:
+      - "8088:8088"
+      - "8030:8030"
+      - "8031:8031"
+      - "8032:8032"
+      - "8033:8033"
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://cdp-namenode:9000
+      - YARN_CONF_yarn_resourcemanager_hostname=cdp-resourcemanager
+      - YARN_CONF_yarn_resourcemanager_address=cdp-resourcemanager:8032
+      - YARN_CONF_yarn_resourcemanager_scheduler_address=cdp-resourcemanager:8030
+      - YARN_CONF_yarn_resourcemanager_resource___tracker_address=cdp-resourcemanager:8031
+      - YARN_CONF_yarn_resourcemanager_admin_address=cdp-resourcemanager:8033
+      - YARN_CONF_yarn_resourcemanager_webapp_address=0.0.0.0:8088
+      - YARN_CONF_yarn_nodemanager_aux_services=mapreduce_shuffle
+      - YARN_CONF_yarn_nodemanager_resource_memory___mb=4096
+      - YARN_CONF_yarn_nodemanager_resource_cpu___vcores=4
+      - YARN_CONF_yarn_scheduler_maximum___allocation___mb=4096
+      - YARN_CONF_yarn_scheduler_maximum___allocation___vcores=4
+      - YARN_CONF_yarn_nodemanager_vmem___check___enabled=false
+    command: ["yarn", "resourcemanager"]
+    depends_on:
+      cdp-namenode:
+        condition: service_healthy
+    networks:
+      - cdp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # YARN NodeManager
+  cdp-nodemanager:
+    image: apache/hadoop:3.3.4
+    container_name: cdp-nodemanager
+    hostname: cdp-nodemanager
+    ports:
+      - "8042:8042"
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://cdp-namenode:9000
+      - YARN_CONF_yarn_resourcemanager_hostname=cdp-resourcemanager
+      - YARN_CONF_yarn_resourcemanager_address=cdp-resourcemanager:8032
+      - YARN_CONF_yarn_resourcemanager_scheduler_address=cdp-resourcemanager:8030
+      - YARN_CONF_yarn_resourcemanager_resource___tracker_address=cdp-resourcemanager:8031
+      - YARN_CONF_yarn_nodemanager_aux_services=mapreduce_shuffle
+      - YARN_CONF_yarn_nodemanager_resource_memory___mb=4096
+      - YARN_CONF_yarn_nodemanager_resource_cpu___vcores=4
+      - YARN_CONF_yarn_nodemanager_webapp_address=0.0.0.0:8042
+      - YARN_CONF_yarn_nodemanager_vmem___check___enabled=false
+      - YARN_CONF_yarn_nodemanager_pmem___check___enabled=false
+    command: ["yarn", "nodemanager"]
+    depends_on:
+      cdp-resourcemanager:
+        condition: service_healthy
+    networks:
+      - cdp-network
+
+  # Hive Metastore
+  cdp-hive-metastore:
+    image: apache/hive:3.1.3
+    container_name: cdp-hive-metastore
+    hostname: cdp-hive-metastore
+    ports:
+      - "9083:9083"
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://cdp-postgres:5432/hive_metastore -Djavax.jdo.option.ConnectionUserName=cdp -Djavax.jdo.option.ConnectionPassword=cdp_password
+      - HADOOP_HOME=/opt/hadoop
+    volumes:
+      - ./volumes/shared:/shared
+    depends_on:
+      cdp-postgres:
+        condition: service_healthy
+      cdp-namenode:
+        condition: service_healthy
+    networks:
+      - cdp-network
+    healthcheck:
+      test: ["CMD", "netstat", "-tlnp", "|", "grep", ":9083"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # HiveServer2
+  cdp-hive:
+    image: apache/hive:3.1.3
+    container_name: cdp-hive
+    hostname: cdp-hive
+    ports:
+      - "10000:10000"
+      - "10002:10002"
+    environment:
+      - SERVICE_NAME=hiveserver2
+      - SERVICE_OPTS=-Dhive.metastore.uris=thrift://cdp-hive-metastore:9083 -Dhive.server2.thrift.bind.host=0.0.0.0
+      - IS_RESUME=true
+      - HADOOP_HOME=/opt/hadoop
+    volumes:
+      - ./volumes/shared:/shared
+    depends_on:
+      cdp-hive-metastore:
+        condition: service_healthy
+    networks:
+      - cdp-network
+
+  # Impala Catalog Server
+  cdp-impala-catalog:
+    image: cloudera/impala:latest
+    container_name: cdp-impala-catalog
+    hostname: cdp-impala-catalog
+    ports:
+      - "25020:25020"
+    environment:
+      - IMPALA_STATE_STORE_HOST=cdp-impala-statestore
+      - IMPALA_CATALOG_SERVICE_HOST=cdp-impala-catalog
+    command: ["/opt/impala/bin/catalogd", "-log_dir=/var/log/impala"]
+    volumes:
+      - ./volumes/shared:/shared
+      - ./volumes/impala-logs:/var/log/impala
+    depends_on:
+      cdp-hive-metastore:
+        condition: service_healthy
+    networks:
+      - cdp-network
+
+  # Impala StateStore
+  cdp-impala-statestore:
+    image: cloudera/impala:latest
+    container_name: cdp-impala-statestore
+    hostname: cdp-impala-statestore
+    ports:
+      - "25010:25010"
+    command: ["/opt/impala/bin/statestored", "-log_dir=/var/log/impala"]
+    volumes:
+      - ./volumes/impala-logs:/var/log/impala
+    depends_on:
+      cdp-zookeeper:
+        condition: service_healthy
+    networks:
+      - cdp-network
+
+  # Impala Daemon
+  cdp-impala:
+    image: cloudera/impala:latest
+    container_name: cdp-impala
+    hostname: cdp-impala
+    ports:
+      - "21000:21000"
+      - "25000:25000"
+    environment:
+      - IMPALA_STATE_STORE_HOST=cdp-impala-statestore
+      - IMPALA_CATALOG_SERVICE_HOST=cdp-impala-catalog
+    command: ["/opt/impala/bin/impalad", 
+              "-log_dir=/var/log/impala",
+              "-state_store_host=cdp-impala-statestore",
+              "-catalog_service_host=cdp-impala-catalog",
+              "-mem_limit=4GB"]
+    volumes:
+      - ./volumes/shared:/shared
+      - ./volumes/impala-logs:/var/log/impala
+    depends_on:
+      - cdp-impala-catalog
+      - cdp-impala-statestore
+    networks:
+      - cdp-network
+
+  # Spark Master
+  cdp-spark-master:
+    image: bitnami/spark:3.4.1
+    container_name: cdp-spark-master
+    hostname: cdp-spark-master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+      - "18080:18080"
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_MASTER_WEBUI_PORT=8080
+      - SPARK_MASTER_HOST=cdp-spark-master
+    volumes:
+      - ./volumes/spark:/opt/bitnami/spark/work
+      - ./volumes/shared:/shared
+    networks:
+      - cdp-network
+
+  # Spark Worker
+  cdp-spark-worker:
+    image: bitnami/spark:3.4.1
+    container_name: cdp-spark-worker
+    hostname: cdp-spark-worker
+    ports:
+      - "8081:8081"
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://cdp-spark-master:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=4
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_WORKER_WEBUI_PORT=8081
+    depends_on:
+      - cdp-spark-master
+    volumes:
+      - ./volumes/spark:/opt/bitnami/spark/work
+      - ./volumes/shared:/shared
+    networks:
+      - cdp-network
+
+  # Simplified Cloudera Manager Interface (Web-based monitoring)
+  cdp-manager:
+    image: nginx:alpine
+    container_name: cdp-manager
+    hostname: cdp-manager
+    ports:
+      - "7180:80"
+    volumes:
+      - ./web/manager:/usr/share/nginx/html
+      - ./web/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - cdp-namenode
+      - cdp-resourcemanager
+    networks:
+      - cdp-network
+
+networks:
+  cdp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  postgres:
+  zookeeper:
+  namenode:
+  datanode:
+  spark:
+  shared:
+  impala-logs:

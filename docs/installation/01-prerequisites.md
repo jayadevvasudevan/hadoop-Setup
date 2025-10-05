@@ -217,11 +217,19 @@ Before proceeding to the next installation step, verify:
 
 ## Next Steps
 
-Once all prerequisites are met, proceed to:
+Once all prerequisites are met, choose your installation path:
+
+### Option 1: Individual Components (Learning Path)
 1. **[Hadoop Installation](02-hadoop-installation.md)** - Core Hadoop setup
 2. **[Hive Installation](03-hive-installation.md)** - Data warehousing
 3. **[Impala Installation](04-impala-installation.md)** - Real-time queries
 4. **[Spark Installation](05-spark-installation.md)** - Analytics engine
+
+### Option 2: Enterprise Platform
+5. **[CDP Installation](06-cdp-installation.md)** - Cloudera Data Platform (Enterprise)
+
+### Option 3: Containerized Development
+- **[Docker Environment](../docker/README.md)** - Quick setup with containers
 
 ## Troubleshooting
 
