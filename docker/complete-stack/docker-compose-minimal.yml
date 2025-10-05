@@ -151,61 +151,6 @@ services:
     networks:
       - bigdata-network
 
-  # Spark Master
-  spark-master:
-    image: bde2020/spark-master:3.3.0-hadoop3.3
-    container_name: spark-master
-    hostname: spark-master
-    ports:
-      - "8080:8080"
-      - "7077:7077"
-    environment:
-      - INIT_DAEMON_STEP=setup_spark
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    volumes:
-      - ./volumes/spark-master:/spark/data
-      - ./volumes/shared:/shared
-    networks:
-      - bigdata-network
-
-  # Spark Worker
-  spark-worker:
-    image: bde2020/spark-worker:3.3.0-hadoop3.3
-    container_name: spark-worker
-    hostname: spark-worker
-    ports:
-      - "8081:8081"
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    depends_on:
-      - spark-master
-    volumes:
-      - ./volumes/spark-worker:/spark/data
-      - ./volumes/shared:/shared
-    networks:
-      - bigdata-network
-
-  # Jupyter Notebook with PySpark
-  jupyter:
-    image: jupyter/pyspark-notebook:latest
-    container_name: jupyter-pyspark
-    hostname: jupyter
-    ports:
-      - "8888:8888"
-    environment:
-      - JUPYTER_ENABLE_LAB=yes
-      - SPARK_MASTER=spark://spark-master:7077
-      - PYSPARK_SUBMIT_ARGS=--master spark://spark-master:7077 pyspark-shell
-    volumes:
-      - ./volumes/notebooks:/home/jovyan/work
-      - ./volumes/shared:/shared
-    depends_on:
-      - spark-master
-    networks:
-      - bigdata-network
-    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
-
 networks:
   bigdata-network:
     driver: bridge
@@ -217,7 +162,4 @@ volumes:
   namenode:
   datanode:
   mysql:
-  spark-master:
-  spark-worker:
-  notebooks:
   shared:
