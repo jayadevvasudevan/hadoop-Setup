@@ -1,0 +1,45 @@
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install prerequisites
+sudo apt install -y openjdk-11-jdk python3 python3-pip curl wget nano
+
+# Install Docker directly in WSL (Option 2)
+# Remove any existing Docker packages
+sudo apt-get remove docker docker-engine docker.io containerd runc
+
+# Update package index
+sudo apt-get update
+
+# Install packages to allow apt to use a repository over HTTPS
+sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Add Docker's official GPG key
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Set up the repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Start Docker service
+sudo service docker start
+
+# Enable Docker to start on boot
+echo "sudo service docker start" >> ~/.bashrc
+
+# Clone your Big Data workspace
+git clone https://github.com/jayadevvasudevan/hadoop-Setup.git
+cd hadoop-Setup
