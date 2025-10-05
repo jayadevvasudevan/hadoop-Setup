@@ -1,26 +1,4 @@
 services:
-  # NameNode Format (runs once to initialize)
-  namenode-format:
-    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-    container_name: hadoop-namenode-format
-    hostname: namenode-format
-    volumes:
-      - ./volumes/namenode:/hadoop/dfs/name
-      - ./volumes/shared:/shared
-    environment:
-      - CLUSTER_NAME=bigdata-cluster
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-      - CORE_CONF_hadoop_http_staticuser_user=root
-      - HDFS_CONF_dfs_namenode_name_dir=/hadoop/dfs/name
-      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
-      - HDFS_CONF_dfs_replication=1
-      - HDFS_CONF_dfs_permissions_enabled=false
-      - HDFS_CONF_dfs_webhdfs_enabled=true
-      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
-    command: ["sh", "-c", "if [ ! -f /hadoop/dfs/name/current/VERSION ]; then hdfs namenode -format -force; fi"]
-    networks:
-      - bigdata-network
-
   # NameNode
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
@@ -43,9 +21,6 @@ services:
       - HDFS_CONF_dfs_webhdfs_enabled=true
       - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
     command: ["hdfs", "namenode"]
-    depends_on:
-      namenode-format:
-        condition: service_completed_successfully
     networks:
       - bigdata-network
     healthcheck:
