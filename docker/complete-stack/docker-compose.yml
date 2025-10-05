@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # NameNode
   namenode:
-    image: apache/hadoop:3.3.4
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: hadoop-namenode
     hostname: namenode
     ports:
@@ -32,7 +30,7 @@ services:
 
   # DataNode
   datanode:
-    image: apache/hadoop:3.3.4
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: hadoop-datanode
     hostname: datanode
     ports:
@@ -54,7 +52,7 @@ services:
 
   # ResourceManager
   resourcemanager:
-    image: apache/hadoop:3.3.4
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
     container_name: hadoop-resourcemanager
     hostname: resourcemanager
     ports:
@@ -76,7 +74,7 @@ services:
 
   # NodeManager
   nodemanager:
-    image: apache/hadoop:3.3.4
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
     container_name: hadoop-nodemanager
     hostname: nodemanager
     ports:
@@ -119,7 +117,7 @@ services:
 
   # Hive Metastore
   hive-metastore:
-    image: apache/hive:3.1.3
+    image: bde2020/hive:2.3.2-postgresql-metastore
     container_name: hive-metastore
     hostname: hive-metastore
     ports:
@@ -138,7 +136,7 @@ services:
 
   # HiveServer2
   hiveserver2:
-    image: apache/hive:3.1.3
+    image: bde2020/hive:2.3.2-postgresql-metastore
     container_name: hive-server2
     hostname: hiveserver2
     ports:

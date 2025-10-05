@@ -152,15 +152,20 @@ Ensure the following ports are accessible:
 
 ### Hosts Configuration
 
-Update `/etc/hosts` file:
+For Docker-based development environment, the default localhost configuration is sufficient:
 
 ```bash
-# Add entries for your cluster nodes
+# Verify /etc/hosts has localhost entry
 127.0.0.1 localhost
-192.168.1.100 hadoop-master
-192.168.1.101 hadoop-worker1
-192.168.1.102 hadoop-worker2
+127.0.1.1 your-hostname
+
+# For multi-node cluster setup (advanced), add:
+# 192.168.1.100 hadoop-master
+# 192.168.1.101 hadoop-worker1  
+# 192.168.1.102 hadoop-worker2
 ```
+
+**Note**: Our Docker Compose setup uses internal Docker networking, so no additional host entries are needed for the containerized services.
 
 ## User Setup
 
