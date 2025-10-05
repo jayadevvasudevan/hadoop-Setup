@@ -7,6 +7,9 @@ services:
     ports:
       - "9870:9870"
       - "9000:9000"
+    volumes:
+      - ./volumes/namenode:/hadoop/dfs/name
+      - ./volumes/shared:/shared
     environment:
       - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
@@ -16,9 +19,7 @@ services:
       - HDFS_CONF_dfs_replication=1
       - HDFS_CONF_dfs_permissions_enabled=false
       - HDFS_CONF_dfs_webhdfs_enabled=true
-    volumes:
-      - ./volumes/namenode:/hadoop/dfs/name
-      - ./volumes/shared:/shared
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check=false
     command: ["hdfs", "namenode"]
     networks:
       - bigdata-network
